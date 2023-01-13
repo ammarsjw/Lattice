@@ -16,6 +16,8 @@ contract Lattice is ERC20, Ownable {
     address public developmentWallet;
     address public marketingWallet;
 
+    /// @dev buyFee -> Development wallet
+    /// @dev sellFee[0] -> Development Wallet and sellFee[1] -> Marketing Wallet
     uint256 public buyFee;
     uint256[2] public sellFee;
 
@@ -76,9 +78,8 @@ contract Lattice is ERC20, Ownable {
     event SetAutomatedMarketMakerPair(address indexed pair, bool indexed state);
 
     constructor() ERC20("The Lattice", "LATI") {
-        // TODO
-        developmentWallet = 0x3edCe801a3f1851675e68589844B1b412EAc6B07;
-        marketingWallet = 0x294d0487fdf7acecf342ae70AFc5549A6E90f3e0;
+        developmentWallet = 0xC6c7a0659C5e3AE8a8a305FfD0aEf1827D3C49B1;
+        marketingWallet = 0x8dB24737563e5b5cFcc9DCEd6439De0D56d53c7D;
 
         buyFee = 20;
         sellFee = [10, 20];
@@ -90,11 +91,7 @@ contract Lattice is ERC20, Ownable {
         buyLimitPercentage = 100;
         sellLimitPercentage = 100;
 
-        // TODO mainnet
-        // uniswapV2Router = IUniswapV2Router02();
-
-        // TODO testnet
-        uniswapV2Router = IUniswapV2Router02(0x01a93b7153Ee160F3176af0B0F31121DF9f0FFA5);
+        uniswapV2Router = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
         // Create a uniswap pair for this new token
         uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory())
@@ -102,21 +99,28 @@ contract Lattice is ERC20, Ownable {
 
         setAutomatedMarketMakerPair(uniswapV2Pair, true);
 
-        // exclude from paying fees or having max transaction amount
-        excludeFromFees(msg.sender, true);
+        address newOwner = 0x3d27d7106f7202ecfF115834EBa72C034E912703;
+
+        // exclude from paying fees
+        excludeFromFees(newOwner, true);
         excludeFromFees(address(this), true);
 
-        // TODO total supply
-        _mint(msg.sender, 25_000_000 * (10 ** 18));
+        // exclude from buy/sell limit and time locks
+        excludeFromLimit(newOwner, true);
+        excludeFromLimit(address(this), true);
+
+        _mint(newOwner, 25_000_000 * (10 ** 18));
+
+        _transferOwnership(newOwner);
     }
 
     function updateDevelopmentWallet(address newDevelopmentWallet) external onlyOwner {
-        require(developmentWallet != newDevelopmentWallet, "Token: Treasury Wallet is already this address");
+        require(developmentWallet != newDevelopmentWallet, "Lattice: Treasury Wallet is already this address");
         developmentWallet = newDevelopmentWallet;
     }
 
     function updateMarketingWallet(address newMarketingWallet) external onlyOwner {
-        require(marketingWallet != newMarketingWallet, "Token: Treasury Wallet is already this address");
+        require(marketingWallet != newMarketingWallet, "Lattice: Treasury Wallet is already this address");
         marketingWallet = newMarketingWallet;
     }
 
@@ -125,40 +129,40 @@ contract Lattice is ERC20, Ownable {
         buyFee = newBuyFee;
     }
 
-    /// @param newSellFee value magnified by 10
+    /// @param newSellFee values magnified by 10
     function updateSellFee(uint256[2] calldata newSellFee) external onlyOwner {
         sellFee = newSellFee;
     }
 
     function updateBuyLockTime(uint256 newBuyLockTime) external onlyOwner {
-        require(buyLockTime != newBuyLockTime, "Token: Buy Lock Time is already this value");
+        require(buyLockTime != newBuyLockTime, "Lattice: Buy Lock Time is already this value");
         buyLockTime = newBuyLockTime;
     }
 
     function updateSellLockTime(uint256 newSellLockTime) external onlyOwner {
-        require(sellLockTime != newSellLockTime, "Token: Sell Lock Time is already this value");
+        require(sellLockTime != newSellLockTime, "Lattice: Sell Lock Time is already this value");
         sellLockTime = newSellLockTime;
     }
 
     function updateLimitTime(uint256 newLimitTime) external onlyOwner {
-        require(limitTime != newLimitTime, "Token: Limit Time is already this value");
+        require(limitTime != newLimitTime, "Lattice: Limit Time is already this value");
         limitTime = newLimitTime;
     }
 
     /// @param newBuyLimitPercentage value magnified by 10
     function updateBuyLimitPercentage(uint256 newBuyLimitPercentage) external onlyOwner {
-        require(buyLimitPercentage != newBuyLimitPercentage, "Token: Buy Limit Percentage is already this value");
+        require(buyLimitPercentage != newBuyLimitPercentage, "Lattice: Buy Limit Percentage is already this value");
         buyLimitPercentage = newBuyLimitPercentage;
     }
 
     /// @param newSellLimitPercentage value magnified by 10
     function updateSellLimitPercentage(uint256 newSellLimitPercentage) external onlyOwner {
-        require(sellLimitPercentage != newSellLimitPercentage, "Token: Sell Limit Percentage is already this value");
+        require(sellLimitPercentage != newSellLimitPercentage, "Lattice: Sell Limit Percentage is already this value");
         sellLimitPercentage = newSellLimitPercentage;
     }
 
     function updateUniswapV2Router(address newUniswapV2Router) external onlyOwner {
-        require(newUniswapV2Router != address(uniswapV2Router), "Token: The router is already this address");
+        require(newUniswapV2Router != address(uniswapV2Router), "Lattice: The router is already this address");
         emit UpdateUniswapV2Router(newUniswapV2Router, address(uniswapV2Router));
         uniswapV2Router = IUniswapV2Router02(newUniswapV2Router);
     }
@@ -168,7 +172,7 @@ contract Lattice is ERC20, Ownable {
     }
 
     function blackListAddress(address account, bool blacklisted) external onlyOwner {
-        require(_isBlacklisted[account] != blacklisted, "Token: Account is already the value of 'blacklisted'");
+        require(_isBlacklisted[account] != blacklisted, "Lattice: Account is already the value of 'blacklisted'");
         _isBlacklisted[account] = blacklisted;
 
         emit BlackListAddress(account, blacklisted);
@@ -187,7 +191,7 @@ contract Lattice is ERC20, Ownable {
     }
 
     function excludeFromFees(address account, bool excluded) public onlyOwner {
-        require(_isExcludedFromFees[account] != excluded, "Token: Account is already the value of 'excluded'");
+        require(_isExcludedFromFees[account] != excluded, "Lattice: Account is already the value of 'excluded'");
         _isExcludedFromFees[account] = excluded;
 
         emit ExcludeFromFees(account, excluded);
@@ -205,8 +209,8 @@ contract Lattice is ERC20, Ownable {
         return _isExcludedFromLimit[account];
     }
 
-    function excludeFromLimit(address account, bool excluded) external onlyOwner {
-        require(_isExcludedFromLimit[account] != excluded, "Token: Account is already the value of 'excluded'");
+    function excludeFromLimit(address account, bool excluded) public onlyOwner {
+        require(_isExcludedFromLimit[account] != excluded, "Lattice: Account is already the value of 'excluded'");
         _isExcludedFromLimit[account] = excluded;
 
         emit ExcludeFromLimit(account, excluded);
@@ -221,11 +225,13 @@ contract Lattice is ERC20, Ownable {
     }
 
     function setAutomatedMarketMakerPair(address pair, bool state) public onlyOwner {
-        require(automatedMarketMakerPairs[pair] != state, "Token: Automated Market Maker Pair is already this state");
+        require(automatedMarketMakerPairs[pair] != state, "Lattice: Automated Market Maker Pair is already this state");
         automatedMarketMakerPairs[pair] = state;
 
         emit SetAutomatedMarketMakerPair(pair, state);
     }
+
+    /* ========== BUY/SELL HELPERS ========== */
 
     function _isBuy(address from) internal view returns (bool) {
         // Transfer from pair is a buy swap
@@ -249,7 +255,7 @@ contract Lattice is ERC20, Ownable {
                 getBuyTimeLock[to] = block.timestamp;
             }
             else {
-                revert("Token: Please wait a few minutes for consecutive exchanges");
+                revert("Lattice: Please wait a few minutes for consecutive exchanges");
             }
         }
         else if (_isSell(from, to)) {
@@ -261,7 +267,7 @@ contract Lattice is ERC20, Ownable {
                 getSellTimeLock[from] = block.timestamp;
             }
             else {
-                revert("Token: Please wait a few minutes for consecutive exchanges");
+                revert("Lattice: Please wait a few minutes for consecutive exchanges");
             }
         }
     }
@@ -285,7 +291,7 @@ contract Lattice is ERC20, Ownable {
 
         if (limit.amount + amount > totalSupply.mul(buyLimitPercentage).div(1000)) {
             require(block.timestamp > limit.startTime.add(limitTime),
-                "Token: Daily exchange limit reached. Please try again after limit expires or try a different amount");
+                "Lattice: Daily exchange limit reached. Please try again after limit expires or try a different amount");
         }
 
         if (block.timestamp > limit.startTime + limitTime) {
@@ -316,7 +322,7 @@ contract Lattice is ERC20, Ownable {
 
         if (limit.amount + amount > totalSupply.mul(sellLimitPercentage).div(1000)) {
             require(block.timestamp > limit.startTime.add(limitTime),
-                "Token: Daily exchange limit reached. Please try again after limit expires or try a different amount");
+                "Lattice: Daily exchange limit reached. Please try again after limit expires or try a different amount");
         }
 
         if (block.timestamp > limit.startTime + limitTime) {
@@ -335,8 +341,8 @@ contract Lattice is ERC20, Ownable {
         address to,
         uint256 amount
     ) internal override {
-        require(!_isBlacklisted[from], "Token: tranfer from a blacklisted address");
-        require(!_isBlacklisted[to], "Token: tranfer to a blacklisted address");
+        require(!_isBlacklisted[from], "Lattice: tranfer from a blacklisted address");
+        require(!_isBlacklisted[to], "Lattice: tranfer to a blacklisted address");
 
         if (amount == 0) {
             super._transfer(from, to, 0);
@@ -357,11 +363,11 @@ contract Lattice is ERC20, Ownable {
             }
 
             if (!_isExcludedFromFees[to]) {
-                uint256 fee = amount.mul(buyFee).div(1000);
+                uint256 feeDevelopment = amount.mul(buyFee).div(1000);
 
-                amount -= fee;
+                amount -= feeDevelopment;
 
-                super._transfer(from, developmentWallet, fee);
+                super._transfer(from, developmentWallet, feeDevelopment);
             }
         }
 
